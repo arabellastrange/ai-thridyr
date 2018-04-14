@@ -15,9 +15,8 @@ import java.util.Random;
 
 import pacman.controllers.Controller;
 import pacman.controllers.HumanController;
+import pacman.controllers.examples.Cluster;
 import pacman.controllers.examples.Legacy;
-import pacman.controllers.examples.MyPacMan;
-import pacman.controllers.examples.RandomPacMan;
 import pacman.game.Constants.GHOST;
 import pacman.game.Constants.MOVE;
 import pacman.game.Game;
@@ -49,8 +48,8 @@ public class Executor {
 		// From Damien: This is the version to run to get an estimated grade for
 		// your submission
 
-		// int numTrials = 100;
-		 //exec.runExperiment(new MyPacMan(), new Legacy(), numTrials);
+		   int numTrials = 100;
+		   exec.runExperiment(new Cluster(), new Legacy(), numTrials);
 
 		// run a game in synchronous mode: game waits until controllers respond.
 		//  int delay = 16;
@@ -59,9 +58,9 @@ public class Executor {
 
 		/// *
 		// run the game in asynchronous mode.
-		boolean visual = true;
+		   //boolean visual = true;
 		//exec.runGameTimed(new NearestPillPacMan(),new  AggressiveGhosts(),visual);
-		exec.runGameTimed(new MyPacMan(), new Legacy(), visual);
+		   //exec.runGameTimed(new Cluster(), new Legacy(), visual);
 		// exec.runGameTimed(new HumanController(new KeyBoardInput()),new
 		// StarterGhosts(),visual);
 		// */
