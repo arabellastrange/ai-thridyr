@@ -13,17 +13,18 @@ import pacman.game.GameView;
 public class Cluster2 extends Controller<MOVE> {
 
     private PillClusterManager clusterManager;
-    private MOVE[] lastTwoMoves = new MOVE[2];
-    private boolean recentlyStuck = false;
+    private MOVE[] lastTwoBestClusters = new MOVE[2];
     private int loopCounter = 0;
-    private int stuckAt = 0;
-    int currentLevel = 0;
+    private int stuckAt = Integer.MIN_VALUE;
+    private int currentLevel = 0;
+    private HashMap<NodeDistance,Double> nodesScores;
+
     public MOVE getMove(Game game, long timeDue) {
-        //System.out.println(game.getCurrentLevel());
         int MIN_DISTANCE;
+        nodesScores = new HashMap<>();
 
         //if on last life be more careful
-        if(game.getPacmanNumberOfLivesRemaining() < 1){
+        if(game.getPacmanNumberOfLivesRemaining() <= 1){
            MIN_DISTANCE = 10;
         } else {
             MIN_DISTANCE = 8;
@@ -31,26 +32,19 @@ public class Cluster2 extends Controller<MOVE> {
 
         double[] moveScores = new double[5];
 
-        if(loopCounter - 25 > stuckAt){
-            recentlyStuck = false;
-        }
-
         int current = game.getPacmanCurrentNodeIndex();
-
-        if(lastTwoMoves[0] != null){
-            //System.out.println("the last move is: " + lastTwoMoves[1]);
-            //System.out.println("the move before last is: " + lastTwoMoves[0]);
-        }
 
         //Strategy 1: if any non-edible ghost is too close (less than MIN_DISTANCE), run away
         for(Constants.GHOST ghost : Constants.GHOST.values()){
             if(game.getGhostEdibleTime(ghost)==0 && game.getGhostLairTime(ghost)==0){
-
                 if(game.getShortestPathDistance(current,game.getGhostCurrentNodeIndex(ghost)) < MIN_DISTANCE){
                    // System.out.println("Ghost too close, ah!");
                     MOVE nextMove =  game.getNextMoveAwayFromTarget(game.getPacmanCurrentNodeIndex(),game.getGhostCurrentNodeIndex(ghost), DM.EUCLID);
-                    lastTwoMoves[1] = nextMove;
                     loopCounter++;
+                    if(game.getPillIndex(current) != -1 || game.getPowerPillIndex(current) != -1) {
+                        // System.out.println("taking pill out of cluster");
+                        clusterManager.removeElement(game, current);
+                    }
                     return nextMove;
                 }
             }
@@ -60,79 +54,109 @@ public class Cluster2 extends Controller<MOVE> {
         int minDistance = Integer.MAX_VALUE;
         Constants.GHOST minGhost = null;
 
-        for(Constants.GHOST ghost : Constants.GHOST.values())
+        for(Constants.GHOST ghost : Constants.GHOST.values()){
             if(game.getGhostEdibleTime(ghost) > 0) {
-                int distance=game.getShortestPathDistance(current,game.getGhostCurrentNodeIndex(ghost));
-                if(distance < minDistance)
-                {
+                int distance = game.getShortestPathDistance(current,game.getGhostCurrentNodeIndex(ghost));
+                if(distance < minDistance) {
                     minDistance=distance;
                     minGhost=ghost;
                 }
             }
+        }
+
 
         if(minGhost != null) {   //we found an edible ghost
             // dont chase far away ghosts
             if(minDistance < 120){
-              //  System.out.println("there is yummy ghost nearby, its " + minDistance + " away");
                 MOVE nextMove = game.getNextMoveTowardsTarget(game.getPacmanCurrentNodeIndex(), game.getGhostCurrentNodeIndex(minGhost), DM.EUCLID);
-                lastTwoMoves[1] = nextMove;
                 loopCounter++;
+                if(game.getPillIndex(current) != -1 || game.getPowerPillIndex(current) != -1) {
+                    clusterManager.removeElement(game, current);
+                }
                 return nextMove;
             }
         }
 
         //Strategy 3:  chase clustered pills
         if (clusterManager == null || game.getCurrentLevel() != currentLevel) {
-            currentLevel++;
+            if(clusterManager != null){
+                currentLevel++;
+            }
            // System.out.println("No cluster already exists");
             clusterManager = new PillClusterManager(game);
         } else if(game.getPillIndex(current) != -1 || game.getPowerPillIndex(current) != -1) {
-           // System.out.println("taking pill out of cluster");
+            //System.out.println("taking pill out of cluster");
             clusterManager.removeElement(game, current);
         }
 
         List<NodeDistance> closestClusters = clusterManager.findClosestNodeIndexPerCluster(game, current);
-       // System.out.println("The nearest cluster is  " + closestClusters.toString() + " it contains " + closestClusters.size() + " nodes");
+        System.out.println("The nearest cluster is  " + closestClusters.toString() + " it contains " + closestClusters.size() + " nodes");
 
+        System.out.println("looping thru nodes");
         for (NodeDistance node : closestClusters) {
-            double score = node.size / (100 * node.distance);
-            MOVE move = game.getNextMoveTowardsTarget(current, node.index, DM.EUCLID);
-            moveScores[move.ordinal()] += score;
+            double score = node.size / (15 * (node.distance + 1)); // how heavily to penalise far away clusters
+            //MOVE move = game.getNextMoveTowardsTarget(current, node.index, DM.EUCLID);
+            System.out.println("Node " + node.toString() + " scores " + score + " has size: " + node.size + " and is " + node.distance + " far away");
+            nodesScores.put(node, score);
+            //moveScores[move.ordinal()] += score;
         }
 
-        double max = 0;
-        MOVE biggestClusterNode = null;
-        int i = 0;
-        for (double score : moveScores) {
-            if (max < score) {
-                max = score;
-                biggestClusterNode = MOVE.values()[i];
-            }
-            i++;
-        }
+//        double max = 0;
+//        MOVE biggestClusterNode = null;
+//        int i = 0;
+//        for (double s : moveScores) {
+//            System.out.println("Scores stored in moveScores: " + s);
+//            if (max < s) {
+//                max = s;
+//                biggestClusterNode = MOVE.values()[i];
+//            }
+//            i++;
+//        }
+//
+         nodesScores.forEach((n,s) -> System.out.println("Node: " + n + " score: " + s) );
+//
+//        if(lastTwoBestClusters[0] == null){
+//            lastTwoBestClusters[0] = biggestClusterNode;
+//        } else if(lastTwoBestClusters[0] != null && lastTwoBestClusters == null){
+//            lastTwoBestClusters[1] = biggestClusterNode;
+//        } else {
+//            lastTwoBestClusters[0] = lastTwoBestClusters[1];
+//            lastTwoBestClusters[1] = biggestClusterNode;
+//        }
+
+//        if(loopCounter > 1) {
+//            MOVE choosen = lastTwoBestClusters[0];
+//            System.out.println("checkpoint");
+//            //System.out.println(lastTwoBestClusters);
+//            if(lastTwoBestClusters[0].ordinal() == biggestClusterNode.ordinal() && lastTwoBestClusters[1].ordinal() != biggestClusterNode.ordinal()){
+//                System.out.println("in FLUX");
+//                biggestClusterNode = lastTwoBestClusters[0];
+//                choosen = biggestClusterNode;
+//                lastTwoBestClusters[1] = choosen;
+//                stuckAt = loopCounter;
+//            }
+//
+//            if(loopCounter - stuckAt < 3){
+//                System.out.println("overiding choices cause we were recently stuck");
+//                loopCounter++;
+//                lastTwoBestClusters[0] = lastTwoBestClusters[1];
+//                lastTwoBestClusters[1] = lastTwoBestClusters[0];
+//                System.out.println("STUCK: Biggest score is " + max + " so go " + choosen.toString());
+//                System.out.println("STUCK: At loop " + loopCounter + " last biggest cluster is: " + lastTwoBestClusters[1] + " cluster before last is " + lastTwoBestClusters[0] + " and current cluster is " + biggestClusterNode);
+//                return choosen;
+//            }
+//        }
 
         // DEBUG draw clusters
         clusterManager.drawClusters(game);
 
-        // strategy four: if all else fails pick a random move and just go
-//        if(lastTwoMoves[0] != null && !recentlyStuck){
-//            Random random = new Random();
-//            MOVE[] allMoves=MOVE.values();
-//            if(biggestClusterNode == lastTwoMoves[0] && biggestClusterNode != lastTwoMoves[1]){
-//                MOVE nextMove = allMoves[random.nextInt(allMoves.length)];
-//                lastTwoMoves[1] = nextMove;
-//                recentlyStuck = true;
-//                stuckAt = loopCounter;
-//                loopCounter++;
-//                return nextMove;
-//            }
-//        }
-        // reset to false after some time????
-        //System.out.println("to get to the closest cluster go " + biggestClusterNode.toString());
-        lastTwoMoves[0] = game.getPacmanLastMoveMade();
-        lastTwoMoves[1] = biggestClusterNode;
+//        System.out.println("Biggest score is " + max + " so go " + biggestClusterNode.toString());
+//        System.out.println("At loop " + loopCounter + " last biggest cluster is: " + lastTwoBestClusters[1] + " cluster before last is " + lastTwoBestClusters[0] + " and current cluster is " + biggestClusterNode);
+
         loopCounter++;
-        return biggestClusterNode;
+
+        NodeDistance best = nodesScores.entrySet().stream().max((n, s) -> n.getValue() > s.getValue() ? 1 : -1).get().getKey();
+        return game.getNextMoveTowardsTarget(current, best.index, DM.EUCLID);
     }
 
     private class NodeDistance {
@@ -151,9 +175,11 @@ public class Cluster2 extends Controller<MOVE> {
     private class ConnectedComponents {
 
         private final SortedSet<Integer> clusterElements;
+        private int clusterSize;
 
         public ConnectedComponents(Collection<Integer> pillsInCluster) {
             clusterElements = new TreeSet<>(pillsInCluster);
+            clusterSize = clusterElements.size();
         }
 
 
@@ -194,7 +220,7 @@ public class Cluster2 extends Controller<MOVE> {
             for (int neighbourIndex : neighbours) {
                 MOVE direction = game.getMoveToMakeToReachDirectNeighbour(nodeIndex, neighbourIndex);
                 int count = 0;
-                int MAX_PILL_DISTANCE = 12;
+                int MAX_PILL_DISTANCE = 5;
 
                 while (count < MAX_PILL_DISTANCE && neighbourIndex != -1 && game.getPillIndex(neighbourIndex) == -1 && game.getPowerPillIndex(neighbourIndex) == -1) {
                     count++;
@@ -245,6 +271,10 @@ public class Cluster2 extends Controller<MOVE> {
                 ints[i++] = value;
             }
             GameView.addPoints(game, color, ints);
+        }
+
+        public int size() {
+            return clusterSize;
         }
     }
 

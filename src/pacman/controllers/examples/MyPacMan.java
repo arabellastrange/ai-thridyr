@@ -17,18 +17,19 @@ import static pacman.game.Constants.*;
  * 3. Go to the nearest pill/power pill
  */
 public class MyPacMan extends Controller<MOVE>
-{	
-	private static int MIN_DISTANCE;	//if a ghost is this close, run away
-	
-	public MOVE getMove(Game game,long timeDue)
+{
+
+    public MOVE getMove(Game game,long timeDue)
 	{			
 		int current=game.getPacmanCurrentNodeIndex();
+		//if on last life be more careful
+        int MIN_DISTANCE;
 
-		if(game.getPacmanNumberOfLivesRemaining() < 1){
-			MIN_DISTANCE = 8;
-		} else {
+        //if(game.getPacmanNumberOfLivesRemaining() < 1){
+		//	MIN_DISTANCE = 8;
+		//} else {
 			MIN_DISTANCE = 5;
-		}
+		//}
 
 		//Strategy 1: if any non-edible ghost is too close (less than MIN_DISTANCE), run away
 		for(GHOST ghost : GHOST.values())
@@ -50,7 +51,7 @@ public class MyPacMan extends Controller<MOVE>
 				}
 			}
 		
-		if(minGhost!=null) {
+		if(minGhost != null) {
             //we found an edible ghost
             if(minDistance < 120){
                 return game.getNextMoveTowardsTarget(game.getPacmanCurrentNodeIndex(), game.getGhostCurrentNodeIndex(minGhost), DM.EUCLID);
@@ -58,10 +59,10 @@ public class MyPacMan extends Controller<MOVE>
         }
 
 		//Strategy 3: go after the pills and power pills
-		int[] pills=game.getPillIndices();
-		int[] powerPills=game.getPowerPillIndices();		
+		int[] pills = game.getPillIndices();
+		int[] powerPills = game.getPowerPillIndices();
 		
-		ArrayList<Integer> targets=new ArrayList<Integer>();
+		ArrayList<Integer> targets=new ArrayList<>();
 		
 		for(int i=0;i<pills.length;i++)					//check which pills are available			
 			if(game.isPillStillAvailable(i))
@@ -73,9 +74,10 @@ public class MyPacMan extends Controller<MOVE>
 		
 		int[] targetsArray=new int[targets.size()];		//convert from ArrayList to array
 		
-		for(int i=0;i<targetsArray.length;i++)
+		for(int i = 0;i<targetsArray.length;i++){
 			targetsArray[i]=targets.get(i);
-		
+		}
+
 		//return the next direction once the closest target has been identified
 		return game.getNextMoveTowardsTarget(current,game.getClosestNodeIndexFromNodeIndex(current,targetsArray,DM.EUCLID),DM.EUCLID);
 	}
